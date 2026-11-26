@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rune Factory 3 Special Gift Finder</title>
+<style>
+  :root {
+    --bg: #14151c;
+    --panel: #1f212b;
+    --border: #353846;
+    --text: #e7e8ee;
+    --muted: #9497a6;
+    --love: #3f7d4f;
+    --like: #3f5f7d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.4;
+  }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 24px 16px 64px;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin: 0 0 4px;
+  }
+  p.sub {
+    color: var(--muted);
+    margin: 0 0 24px;
+    font-size: 0.9rem;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  input[type="text"], select {
+    width: 100%;
+    padding: 10px;
+    font-size: 1rem;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .results {
+    margin-top: 16px;
+  }
+  .result-group {
+    margin-bottom: 14px;
+  }
+  .result-group h3 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 0 0 6px;
+  }
+  .love h3 { color: #7fc490; }
+  .like h3 { color: #7fa6c4; }
+  ul.char-list, ul.item-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  ul.char-list li, ul.item-list li {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+  }
+  .love li { background: rgba(63,125,79,0.25); border-color: var(--love); }
+  .like li { background: rgba(63,95,125,0.25); border-color: var(--like); }
+  .empty {
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer {
+    color: var(--muted);
+    font-size: 0.78rem;
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+    margin-top: 32px;
+  }
+  footer p { margin: 0 0 6px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Rune Factory 3 Special Gift Finder</h1>
+  <p class="sub">Type an item to see which villagers love it or like it. Or pick a villager to see their full loved/liked lists.</p>
+
+  <div class="panel">
+    <label for="item-search">Search by item</label>
+    <input type="text" id="item-search" placeholder="e.g. Chocolate Cake, Platinum, Curry Udon" autocomplete="off">
+    <div class="results" id="item-results"></div>
+  </div>
+
+  <div class="panel">
+    <label for="char-select">Browse by villager</label>
+    <select id="char-select">
+      <option value="">Choose a villager&hellip;</option>
+    </select>
+    <div class="results" id="char-results"></div>
+  </div>
+
+  <footer id="disclosure">
+    <p>Data source: steamah.com, "Rune Factory 3 Special Gifting Guide for All Villagers" (posted September 7, 2023). Fetched 2026-11-26.</p>
+    <p>24 villagers covered by the source, all 24 parsed with a non-empty Loved and Liked list; none were skipped or invented.</p>
+    <p>The source itself has a typo in one item name (Ondorus's liked list reads "Orange Juicewimg]"); that is copied here exactly as the source wrote it rather than corrected, so nothing is invented.</p>
+    <p>Single source, no disliked list. Community gift guides can disagree with each other and with in-game behavior. Verify in-game.</p>
+  </footer>
+</main>
+
+<script src="data.js"></script>
+<script>
+(function () {
+  var itemInput = document.getElementById("item-search");
+  var itemResults = document.getElementById("item-results");
+  var charSelect = document.getElementById("char-select");
+  var charResults = document.getElementById("char-results");
+
+  var names = VILLAGERS.map(function (v) { return v.name; }).sort();
+  names.forEach(function (name) {
+    var opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    charSelect.appendChild(opt);
+  });
+
+  function renderGroup(container, label, cls, items) {
+    if (items.length === 0) return;
+    var group = document.createElement("div");
+    group.className = "result-group " + cls;
+    var h = document.createElement("h3");
+    h.textContent = label + " (" + items.length + ")";
+    group.appendChild(h);
+    var ul = document.createElement("ul");
+    ul.className = "char-list";
+    items.forEach(function (item) {
+      var li = document.createElement("li");
+      li.textContent = item;
+      ul.appendChild(li);
+    });
+    group.appendChild(ul);
+    container.appendChild(group);
+  }
+
+  function searchItem(query) {
+    itemResults.innerHTML = "";
+    var q = query.trim().toLowerCase();
+    if (q.length === 0) return;
+
+    var lovers = [];
+    var likers = [];
+
+    VILLAGERS.forEach(function (v) {
+      if (v.loved.some(function (g) { return g.toLowerCase().indexOf(q) !== -1; })) lovers.push(v.name);
+      if (v.liked.some(function (g) { return g.toLowerCase().indexOf(q) !== -1; })) likers.push(v.name);
+    });
+
+    if (lovers.length === 0 && likers.length === 0) {
+      var p = document.createElement("p");
+      p.className = "empty";
+      p.textContent = "No match in the 24 villagers covered by this source.";
+      itemResults.appendChild(p);
+      return;
+    }
+
+    renderGroup(itemResults, "Loves it", "love", lovers);
+    renderGroup(itemResults, "Likes it", "like", likers);
+  }
+
+  function showVillager(name) {
+    charResults.innerHTML = "";
+    if (!name) return;
+    var v = VILLAGERS.find(function (x) { return x.name === name; });
+    if (!v) return;
+    renderGroup(charResults, "Loved", "love", v.loved);
+    renderGroup(charResults, "Liked", "like", v.liked);
+  }
+
+  itemInput.addEventListener("input", function () { searchItem(itemInput.value); });
+  charSelect.addEventListener("change", function () { showVillager(charSelect.value); });
+})();
+</script>
+</body>
+</html>
